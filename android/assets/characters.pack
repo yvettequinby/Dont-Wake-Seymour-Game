@@ -1,0 +1,73 @@
+
+characters.png
+format: RGBA8888
+filter: Nearest,Nearest
+repeat: none
+boss1
+  rotate: false
+  xy: 1, 417
+  size: 350, 564
+  orig: 350, 564
+  offset: 0, 0
+  index: -1
+boss2
+  rotate: false
+  xy: 353, 417
+  size: 350, 564
+  orig: 350, 564
+  offset: 0, 0
+  index: -1
+boss4
+  rotate: false
+  xy: 353, 417
+  size: 350, 564
+  orig: 350, 564
+  offset: 0, 0
+  index: -1
+brick
+  rotate: false
+  xy: 1, 245
+  size: 553, 170
+  orig: 553, 170
+  offset: 0, 0
+  index: -1
+awake_cat1
+  rotate: false
+  xy: 705, 739
+  size: 274, 242
+  orig: 274, 242
+  offset: 0, 0
+  index: -1
+awake_cat2
+  rotate: false
+  xy: 1, 1
+  size: 274, 242
+  orig: 274, 242
+  offset: 0, 0
+  index: -1
+sleeping_cat
+  rotate: false
+  xy: 705, 495
+  size: 274, 242
+  orig: 274, 242
+  offset: 0, 0
+  index: -1
+wall
+  rotate: false
+  xy: 277, 43
+  size: 200, 200
+  orig: 200, 200
+  offset: 0, 0
+  index: -1
+
+characters2.png
+format: RGBA8888
+filter: Nearest,Nearest
+repeat: none
+boss3
+  rotate: false
+  xy: 1, 1
+  size: 350, 564
+  orig: 350, 564
+  offset: 0, 0
+  index: -1
