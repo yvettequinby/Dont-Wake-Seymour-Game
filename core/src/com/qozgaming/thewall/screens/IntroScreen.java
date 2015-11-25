@@ -3,11 +3,11 @@ package com.qozgaming.thewall.screens;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -42,15 +42,19 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 	private Viewport fontViewport;
 	private World world;
 	private SpriteBatch batch;
-	private Texture backgroundTexture;
-	private BitmapFont font;
+	
+	private AssetManager assetManager;
 	private TextureAtlas atlas;
+	private TextureRegion backgroundTexture;
 	private TextureRegion wallTexture;
+	private BitmapFont font;
+	private Sound meow;
+	
 	private Animation bossAnimation;
 	private Animation catAnimation;
 	private float bossAnimationTime = 0f;
 	private float catAnimationTime = 0f;
-	private Sound meow;
+	
 	private Body boss;
 	private Body seymour = null;
 	private Body floorBody;
@@ -68,12 +72,18 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		fontCamera.position.set(Constants.VIRTUAL_WIDTH * 0.5f, Constants.VIRTUAL_HEIGHT * 0.5f, 0.0f);
 		fontViewport = new FitViewport(Constants.VIRTUAL_WIDTH, Constants.VIRTUAL_HEIGHT, fontCamera);
 		
-		backgroundTexture = new Texture(Gdx.files.internal(Constants.ASSET_INTRO_IMAGE));
-		font = new BitmapFont(Gdx.files.internal(Constants.ASSET_FONT));
-		atlas = new TextureAtlas(Gdx.files.internal(Constants.ASSET_PACK));
+		assetManager = new AssetManager();
+		assetManager.load(Constants.ASSET_PACK, TextureAtlas.class);
+		assetManager.load(Constants.ASSET_FONT, BitmapFont.class);
+		assetManager.load(Constants.ASSET_SOUND_MEOW, Sound.class);
+		assetManager.finishLoading(); // Blocks until all resources are loaded into memory
+		
+		atlas = assetManager.get(Constants.ASSET_PACK);
+		backgroundTexture = atlas.findRegion(Constants.ASSET_INTRO_IMAGE);
 		wallTexture = atlas.findRegion(Constants.ASSET_WALL_IMAGE);
-		meow = Gdx.audio.newSound(Gdx.files.internal(Constants.ASSET_SOUND_MEOW));
-		batch = new SpriteBatch();
+		font = assetManager.get(Constants.ASSET_FONT);
+		meow = assetManager.get(Constants.ASSET_SOUND_MEOW);
+		font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
 		
 		Array<AtlasRegion> bosses = new Array<AtlasRegion>();
 		bosses.add(atlas.findRegion(Constants.ASSET_BOSS_IMAGE_1));
@@ -86,6 +96,8 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		cats.add(atlas.findRegion(Constants.ASSET_AWAKE_CAT_IMAGE_1));
 		cats.add(atlas.findRegion(Constants.ASSET_AWAKE_CAT_IMAGE_2));
 		catAnimation = new Animation(Constants.CAT_ANIMATION_STEP, cats, PlayMode.LOOP);
+		
+		batch = new SpriteBatch();
 		
 		Gdx.input.setInputProcessor(this);
 
@@ -116,6 +128,7 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		floorBody = world.createBody(floorBodyDef);
 		floorBody.createFixture(floorFixtureDef);
 		floorBody.setUserData(new Vector2(Constants.SCENE_WIDTH, Constants.BLOCK_HEIGHT));
+		floorShape.dispose();
 		
 		// Boss
 		BodyDef bossBodyDef = new BodyDef();
@@ -134,6 +147,7 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		boss = world.createBody(bossBodyDef);
 		boss.createFixture(bossFixtureDef);
 		boss.setUserData(new Vector2(Constants.BOSS_WIDTH, Constants.BOSS_HEIGHT));
+		bossShape.dispose();
 		
 	}
 	
@@ -155,6 +169,7 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 			seymour = world.createBody(seymourBodyDef);
 			seymour.createFixture(seymourFixtureDef);
 			seymour.setUserData(new Vector2(Constants.CAT_WIDTH, Constants.CAT_HEIGHT));
+			seymourShape.dispose();
 			
 			meow.play();
 		}
@@ -200,8 +215,33 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		
 	}
 	
+	
+	private void writeText(String text, float xPos, float yPos) {
+		GlyphLayout gl = new GlyphLayout();
+		gl.setText(font, text);
+		font.draw(batch, gl, xPos, yPos);
+	}
+	
+	
+	private void renderBody(Body body, TextureRegion textureRegion) {
+		if(body!=null) {
+			float bodyWidth = ((Vector2)body.getUserData()).x;
+			float bodyHeight = ((Vector2)body.getUserData()).y;
+			float xPos = body.getPosition().x - bodyWidth*0.5f;
+			float yPos = body.getPosition().y - bodyHeight*0.5f;
+			batch.draw(textureRegion, 
+					xPos, yPos,  
+					bodyWidth*0.5f, bodyHeight*0.5f, 
+					bodyWidth, bodyHeight,  
+					1f, 1f, (float) Math.toDegrees(body.getAngle()));
+		}
+	}
+	
+	
 	@Override
 	public void render(float delta) {
+		
+		world.step(1 / 60f, 6, 2);
 		
 		timeSinceStart = timeSinceStart + delta;
 		bossAnimationTime = bossAnimationTime + delta;
@@ -209,7 +249,6 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		
 		Gdx.gl.glClearColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, Color.BLACK.a);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-		world.step(1 / 60f, 6, 2);
 		
 		float fontPositionY = Constants.VIRTUAL_HEIGHT * 0.65f;
 		float fontPositionX = Constants.VIRTUAL_WIDTH * 0.3f;
@@ -221,79 +260,36 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		gldws.setText(font, "Don't wake SEYMOUR!");
 		
 		if(timeSinceStart>27f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, " tap to start ");
-			font.draw(batch, gl, fontPositionX + 200f, fontPositionY-100f);
+			writeText(" tap to start ", fontPositionX + 200f, fontPositionY-100f);
 		} else if(timeSinceStart>25f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
 			font.draw(batch, gldws, fontPositionX, fontPositionY);
 			makeSeymour();
 		} else if(timeSinceStart>24f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "Don't wake ");
-			font.draw(batch, gl, fontPositionX, fontPositionY);
+			writeText("Don't wake", fontPositionX, fontPositionY);
 		} else if(timeSinceStart>23f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "Don't");
-			font.draw(batch, gl, fontPositionX, fontPositionY);
+			writeText("Don't", fontPositionX, fontPositionY);
 		} else if(timeSinceStart>21f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "my snoozing cat, Seymour!");
-			font.draw(batch, gl, fontPositionX + 200f, fontPositionY-100f);
+			writeText("my snoozing cat, Seymour!", fontPositionX + 200f, fontPositionY-100f);
 		} else if(timeSinceStart>19f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "But don't you disturb...");
-			font.draw(batch, gl, fontPositionX, fontPositionY);
+			writeText("But don't you disturb...", fontPositionX, fontPositionY);
 		} else if(timeSinceStart>17f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "ONE DOLLAR PER BRICK!");
-			font.draw(batch, gl, fontPositionX + 200f, fontPositionY-100f);
+			writeText("ONE DOLLAR PER BRICK!", fontPositionX + 200f, fontPositionY-100f);
 		}  else if(timeSinceStart>15f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "I will pay you...");
-			font.draw(batch, gl, fontPositionX, fontPositionY);
+			writeText("I will pay you...", fontPositionX, fontPositionY);
 		}  else if(timeSinceStart>13f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "or you're FIRED!");
-			font.draw(batch, gl, fontPositionX + 200f, fontPositionY-100f);
+			writeText("or you're FIRED!", fontPositionX + 200f, fontPositionY-100f);
 		} else if(timeSinceStart>11f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "at least one brick every 3 seconds...");
-			font.draw(batch, gl, fontPositionX, fontPositionY);
+			writeText("at least one brick every 3 seconds...", fontPositionX, fontPositionY);
 		} else if(timeSinceStart>9f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "Do it quickly...");
-			font.draw(batch, gl, fontPositionX + 200f, fontPositionY-100f);
+			writeText("Do it quickly...", fontPositionX + 200f, fontPositionY-100f);
 		} else if(timeSinceStart>7f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "you must knock down the wall");
-			font.draw(batch, gl, fontPositionX, fontPositionY);
+			writeText("you must knock down the wall", fontPositionX, fontPositionY);
 		} else if(timeSinceStart>5f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "DO WHAT I SAY!");
-			font.draw(batch, gl, fontPositionX + 200f, fontPositionY-100f);
+			writeText("DO WHAT I SAY!", fontPositionX + 200f, fontPositionY-100f);
 		} else if(timeSinceStart>3f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "PAY ATTENTION TO ME!");
-			font.draw(batch, gl, fontPositionX, fontPositionY);
+			writeText("PAY ATTENTION TO ME!", fontPositionX, fontPositionY);
 		} else if(timeSinceStart>1f) {
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl = new GlyphLayout();
-			gl.setText(font, "MYEH! I am the boss!");
-			font.draw(batch, gl, fontPositionX + 200f, fontPositionY-100f);
+			writeText("MYEH! I am the boss!", fontPositionX + 200f, fontPositionY-100f);
 		}
 		batch.end();
 		
@@ -301,15 +297,7 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		batch.begin();
 		
 		// render floor
-		float bodyWidth = ((Vector2)floorBody.getUserData()).x;
-		float bodyHeight = ((Vector2)floorBody.getUserData()).y;
-		float xPos = floorBody.getPosition().x - bodyWidth*0.5f;
-		float yPos = floorBody.getPosition().y - bodyHeight*0.5f;
-		batch.draw(wallTexture, 
-				xPos, yPos,  
-				bodyWidth*0.5f, bodyHeight*0.5f, 
-				bodyWidth, bodyHeight,  
-				1f, 1f, (float) Math.toDegrees(floorBody.getAngle()));
+		renderBody(floorBody, wallTexture);
 		
 		// render boss
 		TextureRegion bossTexture = bossAnimation.getKeyFrame(bossAnimationTime);
@@ -319,15 +307,7 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 		if(timeSinceStart<1f || timeSinceStart>25f) {
 			bossTexture = atlas.findRegion(Constants.ASSET_BOSS_IMAGE_1); // stop animating after 19 secs
 		}
-		bodyWidth = ((Vector2)boss.getUserData()).x;
-		bodyHeight = ((Vector2)boss.getUserData()).y;
-		xPos = boss.getPosition().x - bodyWidth*0.5f;
-		yPos = boss.getPosition().y - bodyHeight*0.5f;
-		batch.draw(bossTexture, 
-				xPos, yPos,  
-				bodyWidth*0.5f, bodyHeight*0.5f, 
-				bodyWidth, bodyHeight,  
-				1f, 1f, (float) Math.toDegrees(boss.getAngle()));
+		renderBody(boss, bossTexture);
 		
 		// render seymour
 		if(seymour!=null) {
@@ -335,15 +315,7 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 			if(animateSeymour) {
 				seymourTexture = catAnimation.getKeyFrame(catAnimationTime);
 			}
-			bodyWidth = ((Vector2)seymour.getUserData()).x;
-			bodyHeight = ((Vector2)seymour.getUserData()).y;
-			xPos = seymour.getPosition().x - bodyWidth*0.5f;
-			yPos = seymour.getPosition().y - bodyHeight*0.5f;
-			batch.draw(seymourTexture, 
-					xPos, yPos,  
-					bodyWidth*0.5f, bodyHeight*0.5f, 
-					bodyWidth, bodyHeight,  
-					1f, 1f, (float) Math.toDegrees(seymour.getAngle()));
+			renderBody(seymour, seymourTexture);
 		}
 		
 		
@@ -381,10 +353,8 @@ public class IntroScreen extends InputAdapter implements Screen, ContactListener
 
 	@Override
 	public void dispose() {
-		meow.dispose();
-		atlas.dispose();
-		font.dispose();
-		backgroundTexture.dispose();
+		assetManager.dispose();
 		world.dispose();
+		batch.dispose();
 	}
 }

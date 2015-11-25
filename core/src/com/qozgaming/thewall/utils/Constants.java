@@ -22,12 +22,12 @@ public class Constants {
 	public static final float MIN_BLOCK_WIDTH = 0.5f;
 	public static final float MAX_BLOCK_WIDTH = 6f;
 	
-	public static final String ASSET_BACKGROUND_IMAGE = "background.png";
-	public static final String ASSET_SPLASH_IMAGE = "splash.png"; 
-	public static final String ASSET_INTRO_IMAGE = "intro.png"; 
 	public static final String ASSET_FONT = "sansserif.fnt";
 	
-	public static final String ASSET_PACK = "characters.pack";
+	public static final String ASSET_PACK = "seymourgame.pack";
+	public static final String ASSET_BACKGROUND_IMAGE = "background";
+	public static final String ASSET_SPLASH_IMAGE = "splash"; 
+	public static final String ASSET_INTRO_IMAGE = "intro";
 	public static final String ASSET_SLEEPING_CAT_IMAGE = "sleeping_cat";
 	public static final String ASSET_AWAKE_CAT_IMAGE_1 = "awake_cat1";
 	public static final String ASSET_AWAKE_CAT_IMAGE_2 = "awake_cat2";
@@ -41,7 +41,6 @@ public class Constants {
 	public static final String ASSET_SOUND_BRICK = "brick.mp3";
 	public static final String ASSET_SOUND_MONEY = "money.mp3";
 	public static final String ASSET_SOUND_MEOW = "meow.mp3";
-	public static final String ASSET_SOUND_BLAH = "blah.mp3";
 	
 	public static final float BOSS_ANIMATION_STEP = 1.0f / 7.0f;
 	public static final float CAT_ANIMATION_STEP = 1.0f / 10.0f;

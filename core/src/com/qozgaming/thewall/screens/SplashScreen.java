@@ -3,11 +3,13 @@ package com.qozgaming.thewall.screens;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.qozgaming.thewall.TheWallGame;
@@ -20,15 +22,22 @@ public class SplashScreen extends InputAdapter implements Screen {
 	private OrthographicCamera camera;
 	private Viewport viewport;
 	private SpriteBatch batch;
-	private Texture backgroundTexture;
+	private AssetManager assetManager;
+	private TextureAtlas textureAtlas;
+	private TextureRegion backgroundTexture;
 	
 	
 	public SplashScreen(TheWallGame game) {
 		this.game = game;
 		camera = new OrthographicCamera();
-		viewport = new FitViewport(Constants.SCENE_WIDTH, Constants.SCENE_HEIGHT, camera);
+		camera.position.set(Constants.VIRTUAL_WIDTH * 0.5f, Constants.VIRTUAL_HEIGHT * 0.5f, 0.0f);
+		viewport = new FitViewport(Constants.VIRTUAL_WIDTH, Constants.VIRTUAL_HEIGHT, camera);
 		batch = new SpriteBatch();
-		backgroundTexture = new Texture(Gdx.files.internal(Constants.ASSET_SPLASH_IMAGE));
+		assetManager = new AssetManager();
+		assetManager.load(Constants.ASSET_PACK, TextureAtlas.class);
+		assetManager.finishLoading(); // Blocks until all resources are loaded into memory
+		textureAtlas = assetManager.get(Constants.ASSET_PACK);
+		backgroundTexture = textureAtlas.findRegion(Constants.ASSET_SPLASH_IMAGE);
 	}
 
 	
@@ -48,21 +57,8 @@ public class SplashScreen extends InputAdapter implements Screen {
 
 		batch.begin();
 
-		int width = backgroundTexture.getWidth();
-		int height = backgroundTexture.getHeight();
-		float originX = width * 0.5f;
-		float originY = height * 0.5f;
-
-		batch.draw(backgroundTexture, // Texture
-				-originX, -originY, // x, y
-				originX, originY, // originX, originY
-				width, height, // width, height
-				Constants.WORLD_TO_SCREEN, Constants.WORLD_TO_SCREEN, // scaleX, scaleY
-				0.0f, // rotation
-				0, 0, // srcX, srcY
-				width, height, // srcWidth, srcHeight
-				false, false); // flipX, flipY
-
+		batch.draw(backgroundTexture, 0f, 0f, Constants.VIRTUAL_WIDTH, Constants.VIRTUAL_HEIGHT);
+		
 		batch.end();
 		
 		if(Gdx.input.justTouched()) {
@@ -96,8 +92,8 @@ public class SplashScreen extends InputAdapter implements Screen {
 
 	@Override
 	public void dispose() {
+		assetManager.dispose();
 		batch.dispose();
-		backgroundTexture.dispose();
 	}
 	
 	

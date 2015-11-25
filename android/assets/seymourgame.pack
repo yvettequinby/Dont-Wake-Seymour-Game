@@ -1,73 +1,94 @@
 
-characters.png
+seymourgame.png
 format: RGBA8888
 filter: Nearest,Nearest
 repeat: none
+background
+  rotate: false
+  xy: 1, 1289
+  size: 1280, 720
+  orig: 1280, 720
+  offset: 0, 0
+  index: -1
+intro
+  rotate: false
+  xy: 1, 567
+  size: 1280, 720
+  orig: 1280, 720
+  offset: 0, 0
+  index: -1
 boss1
   rotate: false
-  xy: 1, 417
+  xy: 1283, 1445
   size: 350, 564
   orig: 350, 564
   offset: 0, 0
   index: -1
 boss2
   rotate: false
-  xy: 353, 417
+  xy: 1, 1
   size: 350, 564
   orig: 350, 564
   offset: 0, 0
   index: -1
 boss4
   rotate: false
-  xy: 353, 417
+  xy: 1, 1
+  size: 350, 564
+  orig: 350, 564
+  offset: 0, 0
+  index: -1
+boss3
+  rotate: false
+  xy: 1283, 879
   size: 350, 564
   orig: 350, 564
   offset: 0, 0
   index: -1
 brick
   rotate: false
-  xy: 1, 245
+  xy: 353, 395
   size: 553, 170
   orig: 553, 170
   offset: 0, 0
   index: -1
 awake_cat1
   rotate: false
-  xy: 705, 739
+  xy: 1635, 1767
   size: 274, 242
   orig: 274, 242
   offset: 0, 0
   index: -1
 awake_cat2
   rotate: false
-  xy: 1, 1
+  xy: 1283, 635
   size: 274, 242
   orig: 274, 242
   offset: 0, 0
   index: -1
 sleeping_cat
   rotate: false
-  xy: 705, 495
+  xy: 353, 151
   size: 274, 242
   orig: 274, 242
   offset: 0, 0
   index: -1
 wall
   rotate: false
-  xy: 277, 43
+  xy: 1635, 1565
   size: 200, 200
   orig: 200, 200
   offset: 0, 0
   index: -1
 
-characters2.png
+seymourgame2.png
 format: RGBA8888
 filter: Nearest,Nearest
 repeat: none
-boss3
+splash
   rotate: false
   xy: 1, 1
-  size: 350, 564
-  orig: 350, 564
+  size: 1280, 720
+  orig: 1280, 720
   offset: 0, 0
   index: -1

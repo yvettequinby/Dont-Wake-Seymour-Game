@@ -1,16 +1,13 @@
 package com.qozgaming.thewall.screens;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -40,16 +37,20 @@ import com.badlogic.gdx.utils.Timer.Task;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.qozgaming.thewall.TheWallGame;
+import com.qozgaming.thewall.utils.BodyRole;
 import com.qozgaming.thewall.utils.Constants;
+import com.qozgaming.thewall.utils.GeneralUtil;
+import com.qozgaming.thewall.utils.UserData;
 
 public class GameScreen extends InputAdapter implements Screen, ContactListener {
 	
 	private final TheWallGame game;
 	
 	private SpriteBatch batch;
-	private Texture backgroundTexture;
+	private TextureRegion backgroundTexture;
 	private BitmapFont font;
 	
+	private AssetManager assetManager;
 	private TextureAtlas atlas;
 	private TextureRegion sleepingCatTexture;
 	private TextureRegion wallTexture;
@@ -58,16 +59,12 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 	private Animation catAnimation;
 	private boolean animateSeymour;
 	
+	private Body cat;
+	
 	private boolean moneyShot = true;
 	private Sound meow;
 	private Sound money;
 	private Sound knock;
-		
-	private Body cat;
-	private Body floorBody;
-	private Body boss;
-	private List<Body> wallBodies = new ArrayList<Body>();
-	private List<Body> brickBodies = new ArrayList<Body>();
 	
 	private boolean gameOverSequenceBegun = false;
 	private boolean hasMeowed = false;
@@ -77,16 +74,14 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 	private float timePerBrick = 3f;
 	private int bricksRemoved = 0;
 	private float timeSinceLastBrick = 0f;
+	private float timeSinceGameOver = 0f;
 	private boolean isGameOver = false;
-	private float timeSinceBossKilledBricks = 0f;
 	
 	private Viewport viewport;
 	private OrthographicCamera fontCamera;
 	private Viewport fontViewport;
 	private Vector3 point = new Vector3();
 	private World world;
-	private Body hitBody = null;
-	
 	
 	public GameScreen(final TheWallGame game) {
 		
@@ -100,13 +95,23 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		fontCamera.position.set(Constants.VIRTUAL_WIDTH * 0.5f, Constants.VIRTUAL_HEIGHT * 0.5f, 0.0f);
 		fontViewport = new FitViewport(Constants.VIRTUAL_WIDTH, Constants.VIRTUAL_HEIGHT, fontCamera);
 		
-		backgroundTexture = new Texture(Gdx.files.internal(Constants.ASSET_BACKGROUND_IMAGE));
-		font = new BitmapFont(Gdx.files.internal(Constants.ASSET_FONT));
+		assetManager = new AssetManager();
+		assetManager.load(Constants.ASSET_PACK, TextureAtlas.class);
+		assetManager.load(Constants.ASSET_FONT, BitmapFont.class);
+		assetManager.load(Constants.ASSET_SOUND_MEOW, Sound.class);
+		assetManager.load(Constants.ASSET_SOUND_MONEY, Sound.class);
+		assetManager.load(Constants.ASSET_SOUND_BRICK, Sound.class);
+		assetManager.finishLoading(); // Blocks until all resources are loaded into memory
 		
-		atlas = new TextureAtlas(Gdx.files.internal(Constants.ASSET_PACK));
-		sleepingCatTexture = atlas.findRegion(Constants.ASSET_SLEEPING_CAT_IMAGE);
+		atlas = assetManager.get(Constants.ASSET_PACK);
+		backgroundTexture = atlas.findRegion(Constants.ASSET_INTRO_IMAGE);
 		wallTexture = atlas.findRegion(Constants.ASSET_WALL_IMAGE);
+		sleepingCatTexture = atlas.findRegion(Constants.ASSET_SLEEPING_CAT_IMAGE);
 		brickTexture = atlas.findRegion(Constants.ASSET_BRICK_IMAGE);
+		font = assetManager.get(Constants.ASSET_FONT);
+		meow = assetManager.get(Constants.ASSET_SOUND_MEOW);
+		money = assetManager.get(Constants.ASSET_SOUND_MONEY);
+		knock = assetManager.get(Constants.ASSET_SOUND_BRICK);
 		
 		Array<AtlasRegion> bosses = new Array<AtlasRegion>();
 		bosses.add(atlas.findRegion(Constants.ASSET_BOSS_IMAGE_1));
@@ -119,10 +124,6 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		cats.add(atlas.findRegion(Constants.ASSET_AWAKE_CAT_IMAGE_1));
 		cats.add(atlas.findRegion(Constants.ASSET_AWAKE_CAT_IMAGE_2));
 		catAnimation = new Animation(Constants.CAT_ANIMATION_STEP, cats, PlayMode.LOOP);
-		
-		meow = Gdx.audio.newSound(Gdx.files.internal(Constants.ASSET_SOUND_MEOW));
-		money = Gdx.audio.newSound(Gdx.files.internal(Constants.ASSET_SOUND_MONEY));
-		knock = Gdx.audio.newSound(Gdx.files.internal(Constants.ASSET_SOUND_BRICK));
 		
 		batch = new SpriteBatch();
 		
@@ -144,13 +145,13 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		
 		FixtureDef catFixtureDef = new FixtureDef();
 		catFixtureDef.shape = catShape;
-		//catFixtureDef.density = 1f;
 		catFixtureDef.friction = 0.5f;
 		catFixtureDef.restitution = 0.1f;
 		
 		cat = world.createBody(catBodyDef);
 		cat.createFixture(catFixtureDef);
-		cat.setUserData(new Vector2(Constants.CAT_WIDTH, Constants.CAT_HEIGHT));
+		cat.setUserData(new UserData(BodyRole.SEYMOUR, new Vector2(Constants.CAT_WIDTH, Constants.CAT_HEIGHT)));
+		catShape.dispose();
 				
 	}
 	
@@ -172,15 +173,12 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		
 		Body leftEdgeBody = world.createBody(edgeBodyDef);
 		leftEdgeBody.createFixture(edgeFixtureDef);
-		leftEdgeBody.setUserData(new Vector2(Constants.EDGE_WIDTH, Constants.SCENE_HEIGHT));
-		wallBodies.add(leftEdgeBody);
+		leftEdgeBody.setUserData(new UserData(BodyRole.WALL, new Vector2(Constants.EDGE_WIDTH, Constants.SCENE_HEIGHT)));
 		
 		edgeBodyDef.position.set(Constants.SCENE_WIDTH-Constants.EDGE_WIDTH*0.5f, Constants.SCENE_HEIGHT*0.5f);
 		Body rightEdgeBody = world.createBody(edgeBodyDef);
 		rightEdgeBody.createFixture(edgeFixtureDef);
-		rightEdgeBody.setUserData(new Vector2(Constants.EDGE_WIDTH, Constants.SCENE_HEIGHT));
-		wallBodies.add(rightEdgeBody);		
-		
+		rightEdgeBody.setUserData(new UserData(BodyRole.WALL, new Vector2(Constants.EDGE_WIDTH, Constants.SCENE_HEIGHT)));
 		edgeShape.dispose();
 		
 		// left ledges
@@ -210,10 +208,10 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		floorFixtureDef.friction = 0.5f;
 		floorFixtureDef.restitution = 0f;
 		
-		floorBody = world.createBody(floorBodyDef);
+		Body floorBody = world.createBody(floorBodyDef);
 		floorBody.createFixture(floorFixtureDef);
-		floorBody.setUserData(new Vector2(Constants.SCENE_WIDTH, Constants.BLOCK_HEIGHT));
-		//staticBodies.add(floorBody);
+		floorBody.setUserData(new UserData(BodyRole.FLOOR, new Vector2(Constants.SCENE_WIDTH, Constants.BLOCK_HEIGHT)));
+		floorShape.dispose();
 		
 		// blocks
 		boolean isLedge = false;
@@ -240,11 +238,13 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		return result;
 	}
 	
+	
 	private void gameOverSequence() {
 		if(!gameOverSequenceBegun) {
 			
 			gameOverSequenceBegun = true;
 			
+			// Drop in the boss
 			BodyDef bossBodyDef = new BodyDef();
 			bossBodyDef.type = BodyType.DynamicBody;
 			bossBodyDef.position.set(Constants.SCENE_WIDTH*0.3f, Constants.SCENE_HEIGHT+Constants.BOSS_HEIGHT);
@@ -257,45 +257,63 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 			bossFixtureDef.friction = 1f;
 			bossFixtureDef.restitution = 0.1f;
 			
-			boss = world.createBody(bossBodyDef);
+			Body boss = world.createBody(bossBodyDef);
 			boss.createFixture(bossFixtureDef);
-			boss.setUserData(new Vector2(Constants.BOSS_WIDTH, Constants.BOSS_HEIGHT));
+			boss.setUserData(new UserData(BodyRole.BOSS, new Vector2(Constants.BOSS_WIDTH, Constants.BOSS_HEIGHT)));
+			bossShape.dispose();
 			
-			// make a copy of the brick list
-			List<Body> bricks = new ArrayList<Body>();
-			for(Body body : brickBodies) {
-				bricks.add(body);
+			// destroy the walls
+			Array<Body> worldBodies = new Array<Body>();
+			world.getBodies(worldBodies);
+			for(Body body : worldBodies) {
+				UserData ud = GeneralUtil.retrieveUserData(body);
+				if(BodyRole.WALL.equals(ud.getBodyRole())) {
+					world.destroyBody(body);
+				}
 			}
 			
-			Float b = 0f;
-			for(final Body brick : bricks) {
+			// destroy up to 5 bricks immediately
+			destroyBricks(5);
+			
+			// ten time, destroy bricks in groups of up to 5
+			for(float i=0.25f; i<2.75f; i = i + 0.25f) {
 				Timer.schedule(new Task(){
 					@Override
-					public void run(){
-						world.destroyBody(brick);
-						long soundId = knock.play();
-						knock.setVolume(soundId, 0.2f);
-						brickBodies.remove(brick);
+					public void run() {
+						destroyBricks(5);
 					}
-				}, 0.2f*b.intValue());
-				b = b + 0.25f; // destroy four bricks at a time
+				}, i);
 			}
 			
-			// destroy all the walls in one go
-			final List<Body> walls = new ArrayList<Body>();
-			for(Body body : wallBodies) {
-				walls.add(body);
-			}
+			// Destroy the last of the bricks
 			Timer.schedule(new Task(){
 				@Override
-				public void run(){
-					for(final Body wall : walls) {
-						world.destroyBody(wall);
-						wallBodies.remove(wall);
-					}
+				public void run() {
+					destroyBricks(-1);
 				}
-			}, 0.2f*b.intValue());
+			}, 2.75f);
 			
+		}
+	}
+	
+	
+	private void destroyBricks(int max) {
+		Array<Body> worldBodies = new Array<Body>();
+		world.getBodies(worldBodies);
+		int destroyed = 0;
+		for(Body body : worldBodies) {
+			UserData ud = GeneralUtil.retrieveUserData(body);
+			if(BodyRole.BRICK.equals(ud.getBodyRole())) {
+				world.destroyBody(body);
+				destroyed++;
+				if(max>0 && destroyed>=max) {
+					break;
+				}
+			}
+		}
+		if(destroyed>0) {
+			long soundId = knock.play();
+			knock.setVolume(soundId, 0.2f);
 		}
 	}
 	
@@ -335,9 +353,7 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 			
 			Body blockBody = world.createBody(bodyDef);
 			blockBody.createFixture(fixtureDef);
-			blockBody.setUserData(new Vector2(width, height));
-			brickBodies.add(blockBody);
-			
+			blockBody.setUserData(new UserData(BodyRole.BRICK, new Vector2(width, height)));
 			shape.dispose();
 			
 			availableSpace = availableSpace - width - Constants.BLOCK_X_SPACER;
@@ -362,22 +378,37 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		
 		Body ledgeBody = world.createBody(ledgeBodyDef);
 		ledgeBody.createFixture(ledgeFixtureDef);
-		ledgeBody.setUserData(new Vector2(Constants.LEDGE_WIDTH, Constants.BLOCK_HEIGHT));
-		wallBodies.add(ledgeBody);
-		
+		ledgeBody.setUserData(new UserData(BodyRole.WALL, new Vector2(Constants.LEDGE_WIDTH, Constants.BLOCK_HEIGHT)));
 		ledgeShape.dispose();
 		
 	}
 	
 	
-	QueryCallback callback = new QueryCallback() {
+	QueryCallback brickTouchCallback = new QueryCallback() {
 		@Override
 		public boolean reportFixture (Fixture fixture) {
-			if (!cat.equals(fixture.getBody()) && fixture.getBody().getType().equals(BodyType.DynamicBody) && fixture.testPoint(point.x, point.y)) {
-				hitBody = fixture.getBody();
-				return false;
-			} else
-				return true;
+			boolean result = true;
+			if(fixture.getBody()!=null) {
+				Body body = fixture.getBody();
+				BodyRole bodyRole = GeneralUtil.retrieveUserData(body).getBodyRole();
+				if(BodyRole.BRICK.equals(bodyRole) && fixture.testPoint(point.x, point.y)) {
+					
+					// destroy brick
+					world.destroyBody(body);
+					knock.play();
+					Timer.schedule(new Task(){
+						@Override
+						public void run(){
+							money.play();
+							bricksRemoved++;
+						}
+					}, 0.5f);
+					timeSinceLastBrick = 0f;
+					result = false;
+					
+				}
+			}
+			return result;
 		}
 	};
 	
@@ -386,36 +417,21 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
 		
 		if(start && !isGameOver) {
-			
 			viewport.unproject(point.set(screenX, screenY, 0)); // important to use viewport, not camera
-			
-			hitBody = null;
-			world.QueryAABB(callback, point.x - 0.0001f, point.y - 0.0001f, point.x + 0.0001f, point.y + 0.0001f);
-			if (hitBody != null) {
-				world.destroyBody(hitBody);
-				brickBodies.remove(hitBody);
-				knock.play();
-				Timer.schedule(new Task(){
-					@Override
-					public void run(){
-						money.play();
-						bricksRemoved++;
-					}
-				}, 0.5f);
-				timeSinceLastBrick = 0f;
-			}
-			
+			world.QueryAABB(brickTouchCallback, point.x - 0.0001f, point.y - 0.0001f, point.x + 0.0001f, point.y + 0.0001f);
 		}
-		
 		return false;
 		
 	}
 	
+	
 	@Override
 	public void beginContact(Contact contact) {
 		final Body bodyA = contact.getFixtureA().getBody();
+		BodyRole roleA = GeneralUtil.retrieveUserData(bodyA).getBodyRole();
 		final Body bodyB = contact.getFixtureB().getBody();
-		if(bodyA.equals(cat) && bodyB.equals(floorBody)) {
+		BodyRole roleB = GeneralUtil.retrieveUserData(bodyB).getBodyRole();
+		if(BodyRole.SEYMOUR.equals(roleA) && BodyRole.FLOOR.equals(roleB)) {
 			animateSeymour = true;
 			meow.play();
 			Gdx.app.postRunnable(new Runnable() {
@@ -425,7 +441,7 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 					bodyA.setLinearVelocity(5f, 0f);
                 }
 			});
-		} else if(bodyB.equals(cat) && bodyA.equals(floorBody)) {
+		} else if(BodyRole.SEYMOUR.equals(roleB) && BodyRole.FLOOR.equals(roleA)) {
 			animateSeymour = true;
 			meow.play();
 			Gdx.app.postRunnable(new Runnable() {
@@ -461,6 +477,35 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		// TODO Auto-generated method stub
 		
 	}
+	
+	
+	private void writeText(String text, float yPos) {
+		GlyphLayout gl = new GlyphLayout();
+		gl.setText(font, text);
+		font.draw(batch, gl, (Constants.VIRTUAL_WIDTH-gl.width)*0.5f, yPos);
+	}
+	
+	
+	private void renderBody(Body body, TextureRegion textureRegion) {
+		renderBody(body, textureRegion, 0.5f);
+	}
+	
+	
+	private void renderBody(Body body, TextureRegion textureRegion, float yPosMult) {
+		if(body!=null) {
+			UserData userData = GeneralUtil.retrieveUserData(body);
+			float bodyWidth = userData.getDimensions().x;
+			float bodyHeight = userData.getDimensions().y;
+			float xPos = body.getPosition().x - bodyWidth*0.5f;
+			float yPos = body.getPosition().y - bodyHeight*yPosMult;
+			batch.draw(textureRegion, 
+					xPos, yPos,  
+					bodyWidth*0.5f, bodyHeight*0.5f, 
+					bodyWidth, bodyHeight,  
+					1f, 1f, (float) Math.toDegrees(body.getAngle()));
+		}
+	}
+	
 
 	@Override
 	public void render(float delta) {
@@ -469,10 +514,8 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 		world.step(1 / 60f, 6, 2);
 		
-		if(isGameOver) { // pull out floor when game is over
-			if(brickBodies.isEmpty())  {
-				timeSinceBossKilledBricks = timeSinceBossKilledBricks + delta;
-			}
+		if(isGameOver) { 
+			timeSinceGameOver = timeSinceGameOver + delta;
 			gameOverSequence();
 		}
 		
@@ -500,121 +543,66 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 			// walls, ledges, floor and bricks
 			batch.setProjectionMatrix(viewport.getCamera().combined);
 			batch.begin();
-			for (Body body : wallBodies) {
-				float bodyWidth = ((Vector2)body.getUserData()).x;
-				float bodyHeight = ((Vector2)body.getUserData()).y;
-				float xPos = body.getPosition().x - bodyWidth*0.5f;
-				float yPos = body.getPosition().y - bodyHeight*0.5f;
-				batch.draw(wallTexture, 
-						xPos, yPos,  
-						bodyWidth*0.5f, bodyHeight*0.5f, 
-						bodyWidth, bodyHeight,  
-						1f, 1f, (float) Math.toDegrees(body.getAngle()));
-			}
-			float bodyWidth = ((Vector2)floorBody.getUserData()).x;
-			float bodyHeight = ((Vector2)floorBody.getUserData()).y;
-			float xPos = floorBody.getPosition().x - bodyWidth*0.5f;
-			float yPos = floorBody.getPosition().y - bodyHeight*0.5f;
-			batch.draw(wallTexture, 
-					xPos, yPos,  
-					bodyWidth*0.5f, bodyHeight*0.5f, 
-					bodyWidth, bodyHeight,  
-					1f, 1f, (float) Math.toDegrees(floorBody.getAngle()));
-			for (Body body : brickBodies) {
-				bodyWidth = ((Vector2)body.getUserData()).x;
-				bodyHeight = ((Vector2)body.getUserData()).y;
-				xPos = body.getPosition().x - bodyWidth*0.5f;
-				yPos = body.getPosition().y - bodyHeight*0.5f;
-				batch.draw(brickTexture, 
-						xPos, yPos,  
-						bodyWidth*0.5f, bodyHeight*0.5f, 
-						bodyWidth, bodyHeight,  
-						1f, 1f, (float) Math.toDegrees(body.getAngle()));
-			}
 			
-			// render seymour
-			bodyWidth = ((Vector2)cat.getUserData()).x;
-			bodyHeight = ((Vector2)cat.getUserData()).y;
-			xPos = cat.getPosition().x - bodyWidth*0.5f;
-			if(isCatAwake()) {
-				yPos = cat.getPosition().y - bodyHeight*0.5f;
-				TextureRegion awakeCatTexture = atlas.findRegion(Constants.ASSET_AWAKE_CAT_IMAGE_1);
-				if(animateSeymour) {
-					awakeCatTexture = catAnimation.getKeyFrame(timeSinceBossKilledBricks);
-					cat.setLinearVelocity(5f, 0f);
+			Array<Body> worldBodies = new Array<Body>();
+			world.getBodies(worldBodies);
+			for(Body body : worldBodies) {
+				UserData ud = GeneralUtil.retrieveUserData(body);
+				if(BodyRole.WALL.equals(ud.getBodyRole())) {
+					renderBody(body, wallTexture);
+				} else if(BodyRole.FLOOR.equals(ud.getBodyRole())) {
+					renderBody(body, wallTexture);
+				} else if(BodyRole.BRICK.equals(ud.getBodyRole())) {
+					renderBody(body, brickTexture);
+				} else if(BodyRole.SEYMOUR.equals(ud.getBodyRole())) {
+					if(isCatAwake()) {
+						TextureRegion awakeCatTexture = atlas.findRegion(Constants.ASSET_AWAKE_CAT_IMAGE_1);
+						if(animateSeymour) {
+							awakeCatTexture = catAnimation.getKeyFrame(timeSinceGameOver);
+							body.setLinearVelocity(5f, 0f);
+						}
+						renderBody(body, awakeCatTexture);
+					} else {
+						renderBody(body, sleepingCatTexture, 0.6f);
+					}
+				} else if(BodyRole.BOSS.equals(ud.getBodyRole())) {
+					TextureRegion bossTexture = bossAnimation.getKeyFrame(timeSinceGameOver);
+					renderBody(body, bossTexture);
 				}
-				batch.draw(awakeCatTexture, 
-						xPos, yPos,  
-						bodyWidth*0.5f, bodyHeight*0.5f, 
-						bodyWidth, bodyHeight,  
-						1f, 1f, (float) Math.toDegrees(cat.getAngle()));
-			} else {
-				yPos = cat.getPosition().y - bodyHeight*0.6f;
-				batch.draw(sleepingCatTexture, 
-						xPos, yPos,  
-						bodyWidth*0.5f, bodyHeight*0.5f, 
-						bodyWidth, bodyHeight,  
-						1f, 1f, (float) Math.toDegrees(cat.getAngle()));
 			}
 			
-			if(boss!=null) {
-				// render boss
-				TextureRegion bossTexture = bossAnimation.getKeyFrame(timeSinceBossKilledBricks);
-				bodyWidth = ((Vector2)boss.getUserData()).x;
-				bodyHeight = ((Vector2)boss.getUserData()).y;
-				float bossXPos = boss.getPosition().x - bodyWidth*0.5f;
-				float bossYPos = boss.getPosition().y - bodyHeight*0.5f;
-				batch.draw(bossTexture, 
-						bossXPos, bossYPos,  
-						bodyWidth*0.5f, bodyHeight*0.5f, 
-						bodyWidth, bodyHeight,  
-						1f, 1f, (float) Math.toDegrees(boss.getAngle()));
-			}
 			batch.end();
 			
 			// fonts
 			batch.setProjectionMatrix(fontViewport.getCamera().combined);
 			batch.begin();
-			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 0.7f);
+			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
 			String score = Integer.toString(Math.round(countDown * 10f)) + " / " + bricksRemoved;
 			font.draw(batch, score, 60f, Constants.VIRTUAL_HEIGHT - 25f);
 			if(isGameOver) {
-				if(brickBodies.isEmpty()) {
-					if(timeSinceBossKilledBricks>6f) {
-						font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-						GlyphLayout gl = new GlyphLayout();
-						gl.setText(font, "BUT YOU EARNED... " + bricksRemoved + " DOLLARS");
-						font.draw(batch, gl, (Constants.VIRTUAL_WIDTH-gl.width)*0.5f, Constants.VIRTUAL_HEIGHT * 0.7f);
-						if(moneyShot) {
-							money.play();
-							moneyShot = false;
-						} 
-					} else if(timeSinceBossKilledBricks>4f) {
-						font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-						GlyphLayout gl = new GlyphLayout();
-						gl.setText(font, "YOU'RE FIRED!");
-						font.draw(batch, gl, (Constants.VIRTUAL_WIDTH-gl.width)*0.5f, Constants.VIRTUAL_HEIGHT * 0.7f);
-					} else if(timeSinceBossKilledBricks>2f) {
-						font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-						GlyphLayout gl = new GlyphLayout();
-						if(wokeCat) {
-							gl.setText(font, "YOU WOKE SEYMOUR!");
-						} else {
-							gl.setText(font, "YOU ARE TOO SLOW!");
-						}
-						font.draw(batch, gl, (Constants.VIRTUAL_WIDTH-gl.width)*0.5f, Constants.VIRTUAL_HEIGHT * 0.7f);
-					} else if(timeSinceBossKilledBricks>0f) {
-						font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-						GlyphLayout gl = new GlyphLayout();
-						gl.setText(font, "GAME OVER");
-						font.draw(batch, gl, (Constants.VIRTUAL_WIDTH-gl.width)*0.5f, Constants.VIRTUAL_HEIGHT * 0.7f);
+				float gameOverTextY = Constants.VIRTUAL_HEIGHT * 0.65f;
+				if(timeSinceGameOver>7f) {
+					writeText("BUT YOU EARNED... " + bricksRemoved + " DOLLARS", gameOverTextY);
+					if(moneyShot) {
+						money.play();
+						moneyShot = false;
+					} 
+				} else if(timeSinceGameOver>5f) {
+					writeText("YOU'RE FIRED!", gameOverTextY);
+				} else if(timeSinceGameOver>3f) {
+					if(wokeCat) {
+						writeText("YOU WOKE SEYMOUR!", gameOverTextY);
+					} else {
+						writeText("YOU ARE TOO SLOW!", gameOverTextY);
 					}
+				} else if(timeSinceGameOver>0f) {
+					writeText("GAME OVER", gameOverTextY);
 				}
 			}
 			batch.end();
 			
 			if(isGameOver) {
-				if(timeSinceBossKilledBricks>10f) {
+				if(timeSinceGameOver>10f) {
 					game.showSplashScreen();
 				}
 			}
@@ -625,12 +613,8 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 			batch.setProjectionMatrix(fontViewport.getCamera().combined);
 			batch.begin();
 			font.setColor(Color.BLACK.r, Color.BLACK.g, Color.BLACK.b, 1f);
-			GlyphLayout gl1 = new GlyphLayout();
-			gl1.setText(font, "GET READY TO START");
-			font.draw(batch, gl1, (Constants.VIRTUAL_WIDTH-gl1.width)*0.5f, Constants.VIRTUAL_HEIGHT * 0.5f);
-			GlyphLayout gl2 = new GlyphLayout();
-			gl2.setText(font, Integer.toString(Math.round(countDownToStart)));
-			font.draw(batch, gl2, (Constants.VIRTUAL_WIDTH-gl2.width)*0.5f, Constants.VIRTUAL_HEIGHT * 0.5f-gl1.height*2f);
+			writeText("GET READY TO START", Constants.VIRTUAL_HEIGHT * 0.5f);
+			writeText(Integer.toString(Math.round(countDownToStart)), Constants.VIRTUAL_HEIGHT * 0.4f);
 			batch.end();
 			countDownToStart = countDownToStart - delta;
 			if(countDownToStart<=0) {
@@ -668,13 +652,9 @@ public class GameScreen extends InputAdapter implements Screen, ContactListener 
 
 	@Override
 	public void dispose() {
-		meow.dispose();
-		money.dispose();
-		knock.dispose();
-		font.dispose();
-		atlas.dispose();
-		backgroundTexture.dispose();
+		assetManager.dispose();
 		world.dispose();
+		batch.dispose();
 	}
 
 }
